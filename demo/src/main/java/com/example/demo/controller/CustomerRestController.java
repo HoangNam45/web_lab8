@@ -2,9 +2,12 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.CustomerRequestDTO;
 import com.example.demo.dto.CustomerResponseDTO;
+import com.example.demo.dto.CustomerUpdateDTO;
 import com.example.demo.service.CustomerService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,16 +23,57 @@ public class CustomerRestController {
     
     private final CustomerService customerService;
     
-    @Autowired
     public CustomerRestController(CustomerService customerService) {
         this.customerService = customerService;
     }
-    
-    // GET all customers
-    @GetMapping
-    public ResponseEntity<List<CustomerResponseDTO>> getAllCustomers() {
-        List<CustomerResponseDTO> customers = customerService.getAllCustomers();
+
+
+     // GET advanced search with multiple criteria
+    @GetMapping("/advanced-search")
+    public ResponseEntity<List<CustomerResponseDTO>> advancedSearch(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String status) {
+        List<CustomerResponseDTO> customers = customerService.advancedSearch(name, email, status);
         return ResponseEntity.ok(customers);
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<CustomerResponseDTO> partialUpdateCustomer(
+        @PathVariable Long id,
+        @RequestBody CustomerUpdateDTO updateDTO) {
+    
+    CustomerResponseDTO updated = customerService.partialUpdateCustomer(id, updateDTO);
+    return ResponseEntity.ok(updated);  
+    }
+
+    
+    // GET all customers with pagination and sorting
+    @GetMapping
+    public ResponseEntity<Map<String, Object>> getAllCustomers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+        
+        Page<CustomerResponseDTO> customerPage;
+        
+        if (sortBy != null && !sortBy.isEmpty()) {
+            Sort sort = sortDir.equalsIgnoreCase("asc") 
+                ? Sort.by(sortBy).ascending() 
+                : Sort.by(sortBy).descending();
+            customerPage = customerService.getAllCustomers(page, size, sort);
+        } else {
+            customerPage = customerService.getAllCustomers(page, size);
+        }
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("customers", customerPage.getContent());
+        response.put("currentPage", customerPage.getNumber());
+        response.put("totalItems", customerPage.getTotalElements());
+        response.put("totalPages", customerPage.getTotalPages());
+        
+        return ResponseEntity.ok(response);
     }
     
     // GET customer by ID
@@ -77,4 +121,6 @@ public class CustomerRestController {
         List<CustomerResponseDTO> customers = customerService.getCustomersByStatus(status);
         return ResponseEntity.ok(customers);
     }
+    
+   
 }
